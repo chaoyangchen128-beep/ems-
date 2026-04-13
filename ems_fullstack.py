@@ -10,7 +10,6 @@ if 'blackout' not in st.session_state: st.session_state.blackout = False
 if 'page' not in st.session_state: st.session_state.page = "实时监控"
 if 'threshold' not in st.session_state: st.session_state.threshold = 49.5
 
-# 文本字典
 texts = {
     '中文': {
         'school': "山东理工职业学院",
@@ -37,56 +36,86 @@ t = texts[st.session_state.lang]
 
 st.set_page_config(page_title="Marine EMS Pro", layout="wide")
 
-# --- 2. 增强型 CSS (加入点击震动与呼吸灯) ---
-st.markdown(f"""
+# --- 2. 全新统一色调 CSS (深海极客风) ---
+st.markdown("""
     <style>
-    .stButton>button:active {{ transform: scale(0.90); border: 2px solid #00f2ff; transition: 0.1s; }}
-    .stApp {{ background-color: #050a10; }}
-    @keyframes pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(0, 242, 255, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }} }}
-    .reportview-container .main .block-container{{ padding-top: 1rem; }}
+    /* 全局背景与文字基础色 */
+    .stApp { background-color: #030d1a; color: #d8e8f8; }
+    
+    /* 侧边栏背景调整 */
+    [data-testid="stSidebar"] { background-color: #061426; border-right: 1px solid #112640; }
+    
+    /* 统一大数字（Metric）颜色并增加霓虹发光 */
+    div[data-testid="stMetricValue"] { 
+        color: #00f2ff; 
+        text-shadow: 0 0 15px rgba(0, 242, 255, 0.4); 
+        font-weight: 700; 
+    }
+    
+    /* 统一所有按钮样式为暗色线框风 */
+    .stButton>button { 
+        background-color: transparent; 
+        color: #00f2ff; 
+        border: 1px solid #00f2ff; 
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    .stButton>button:hover {
+        background-color: rgba(0, 242, 255, 0.1);
+        box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+    }
+    .stButton>button:active { transform: scale(0.95); }
+    
+    /* 针对主要警报按钮的特殊覆盖（红色警报风） */
+    button[kind="primary"] { 
+        border-color: #ff4b4b !important; 
+        color: #ff4b4b !important; 
+        background-color: transparent !important;
+    }
+    button[kind="primary"]:hover {
+        background-color: rgba(255, 75, 75, 0.1) !important;
+        box-shadow: 0 0 15px rgba(255, 75, 75, 0.4) !important;
+    }
+    
+    /* 顶部空白微调 */
+    .block-container { padding-top: 2rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 侧边栏：修复后的导航逻辑 ---
+# --- 3. 侧边栏 ---
 with st.sidebar:
     st.markdown(f"### 🏫 {t['school']}")
     st.caption(t['major'])
     st.divider()
     
-    # 语言切换（带强反馈）
     if st.button(f"🌐 {t['lang_btn']}", use_container_width=True):
         st.session_state.lang = 'English' if st.session_state.lang == '中文' else '中文'
-        st.toast("Language Switched!" if st.session_state.lang == 'English' else "语言已切换！")
         st.rerun()
     
-    # 导航菜单
     menu_options = [t['m1'], t['m2'], t['m3']]
-    st.session_state.page = st.radio("Menu", menu_options)
+    st.session_state.page = st.radio("Menu", menu_options, label_visibility="collapsed")
     
     st.divider()
-    st.image("https://img.icons8.com/fluency/96/ship.png", width=80)
+    # 核心修改：使用精确色值匹配的单色航海图标
+    st.image("https://img.icons8.com/ios-filled/100/00f2ff/ship.png", width=60)
 
 # --- 4. 页面内容分发 ---
 
-# A. 实时监控页 (带循环)
 if st.session_state.page == t['m1']:
     st.title(f"⚓ {t['m1']}")
     
     m_row = st.empty()
     c_placeholder = st.empty()
 
-    # 底部控制按钮
     if not st.session_state.blackout:
         if st.button(t['btn_sim'], use_container_width=True, type="primary"):
             st.session_state.blackout = True
-            st.balloons()
             st.rerun()
     else:
         if st.button(t['btn_reset'], use_container_width=True):
             st.session_state.blackout = False
             st.rerun()
 
-    # 模拟实时循环 (仅在本页面执行)
     while st.session_state.page == t['m1']:
         freq = 50.0 + np.random.uniform(-0.02, 0.02) if not st.session_state.blackout else st.session_state.threshold - 0.5
         volts = 440 + np.random.uniform(-2, 2) if not st.session_state.blackout else 0.5
@@ -100,25 +129,29 @@ if st.session_state.page == t['m1']:
             else:
                 col3.success(t['msg_safe'])
         
-        # 频率趋势图
         chart_data = pd.DataFrame(np.random.randn(20, 1)*0.05 + freq, columns=['Hz'])
         c_placeholder.line_chart(chart_data, height=250)
         
         time.sleep(0.8)
-        if st.session_state.page != t['m1']: break # 关键：页面切换时跳出循环
+        if st.session_state.page != t['m1']: break 
 
-# B. 能效分析页 (交互式图表)
 elif st.session_state.page == t['m2']:
     st.title(f"🔋 {t['analysis_title']}")
     
-    # 模拟电池选择
     b_type = st.selectbox("Select Battery Pack", ["ESS-01 (Lithium)", "ESS-02 (Emergency Bank)"])
     
     col_l, col_r = st.columns([2, 1])
     with col_l:
-        # 动态饼图
         df = pd.DataFrame({'Component': ['Anode', 'Cathode', 'Electrolyte'], 'Health': [95, 88, 92]})
-        fig = px.pie(df, values='Health', names='Component', hole=0.6, title=f"{b_type} Composition")
+        # 核心修改：强制 Plotly 图表使用主题色系，并融入透明背景
+        fig = px.pie(df, values='Health', names='Component', hole=0.6)
+        fig.update_traces(marker=dict(colors=['#00f2ff', '#0072ff', '#1e3a5f']))
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)', 
+            font=dict(color='#d8e8f8'),
+            margin=dict(t=20, b=20, l=20, r=20)
+        )
         st.plotly_chart(fig, use_container_width=True)
     
     with col_r:
@@ -128,7 +161,6 @@ elif st.session_state.page == t['m2']:
         st.caption("2026-04-10: Cell Balancing Complete")
         st.caption("2026-04-12: Thermal Test Passed")
 
-# C. 系统设置页 (表单交互)
 elif st.session_state.page == t['m3']:
     st.title(f"⚙️ {t['set_title']}")
     
@@ -140,4 +172,3 @@ elif st.session_state.page == t['m3']:
         if st.form_submit_button(t['set_save']):
             st.session_state.threshold = new_freq
             st.success("Settings Saved! / 设置已保存！")
-            st.toast("Updated parameters successfully.")
