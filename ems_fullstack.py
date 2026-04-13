@@ -3,109 +3,92 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import time
+from datetime import datetime
 
-# 1. 初始化 Session State (状态管理)
+# 1. 初始化状态
 if 'lang' not in st.session_state: st.session_state.lang = '中文'
 if 'blackout' not in st.session_state: st.session_state.blackout = False
+if 'chart_data' not in st.session_state:
+    st.session_state.chart_data = pd.DataFrame([50.0] * 30, columns=['Hz'])
 
-# 2. 中英文语境配置
+# 2. 语言字典
 texts = {
     '中文': {
-        'title': "智能 EMS 智慧终端",
-        'subtitle': "远洋船舶异构动力调度系统",
-        'tab1': "实时监控", 'tab2': "能效分析", 'tab3': "系统设置",
-        'grid_f': "电网频率", 'voltage': "主母排电压", 'soc': "电池荷电状态",
-        'btn_sim': "🚨 模拟全船失电 (紧急)", 'btn_reset': "🔄 重置系统",
-        'msg_safe': "SOLAS 状态: 合规", 'msg_crit': "SOLAS 缺口: 0s 补偿中",
-        'log_start': "🟢 系统进入监测状态...",
-        'log_err': "🔴 检测到动力真空！异构系统秒级切入...",
+        'title': "智能 EMS 实时指挥终端",
+        'grid_f': "实时频率 (Hz)", 'amp': "母排电流 (A)", 'soc': "储能状态 (SOC)",
+        'btn_sim': "🚨 模拟全船失电", 'btn_reset': "🔄 恢复系统",
+        'status': "运行状态", 'safe': "运行正常", 'danger': "紧急切换中",
         'lang_btn': "English Version"
     },
     'English': {
-        'title': "Smart EMS Terminal",
-        'subtitle': "Marine Heterogeneous Power Dispatch",
-        'tab1': "Live Monitor", 'tab2': "Energy Analysis", 'tab3': "Settings",
-        'grid_f': "Grid Freq", 'voltage': "Bus Voltage", 'soc': "Battery SOC",
-        'btn_sim': "🚨 SIMULATE BLACKOUT", 'btn_reset': "🔄 RESET SYSTEM",
-        'msg_safe': "SOLAS: Compliant", 'msg_crit': "SOLAS Gap: 0s Compensating",
-        'log_start': "🟢 System monitoring active...",
-        'log_err': "🔴 Power Vacuum! Heterogeneous system triggered...",
+        'title': "Smart EMS Live Command",
+        'grid_f': "Live Frequency (Hz)", 'amp': "Bus Current (A)", 'soc': "Energy SOC",
+        'btn_sim': "🚨 SIMULATE BLACKOUT", 'btn_reset': "🔄 RECOVER SYSTEM",
+        'status': "Status", 'safe': "OPERATIONAL", 'danger': "EMERGENCY SWITCH",
         'lang_btn': "中文版本"
     }
 }
 t = texts[st.session_state.lang]
 
-# 3. 页面配置与 CSS 动画增强
 st.set_page_config(page_title=t['title'], layout="wide")
 
-st.markdown(f"""
-    <style>
-    /* 全屏闪烁动画 */
-    @keyframes shake {{ 0% {{ transform: translate(1px, 1px) rotate(0deg); }} 10% {{ transform: translate(-1px, -2px) rotate(-1deg); }} 20% {{ transform: translate(-3px, 0px) rotate(1deg); }} }}
-    .stApp {{ background-color: #0a1118; color: white; }}
-    .blackout-active {{ animation: shake 0.5s infinite; border: 5px solid red; }}
-    .metric-card {{ background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid #1e3a5f; }}
-    </style>
-""", unsafe_allow_html=True)
-
-# 4. 侧边栏：多页面切换与语言开关
+# 3. 侧边栏：语言与学校信息
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/ship.png")
-    st.title("Control Center")
-    
-    # 语言切换按钮 (强反馈效果)
+    st.markdown(f"### 🏫 {'山东理工职业学院' if st.session_state.lang=='中文' else 'Shandong Polytechnic'}")
     if st.button(t['lang_btn'], use_container_width=True):
         st.session_state.lang = 'English' if st.session_state.lang == '中文' else '中文'
         st.rerun()
-    
     st.divider()
-    page = st.radio("Menu", [t['tab1'], t['tab2'], t['tab3']])
+    st.info("Project: Heterogeneous Compensation EESS")
 
-# 5. 核心逻辑渲染
-if page == t['tab1']:
-    st.title(t['title'])
-    st.caption(t['subtitle'])
+# 4. 主界面布局
+st.title(t['title'])
 
-    # 顶部卡片
-    c1, c2, c3 = st.columns(3)
-    with c1: st.metric(t['grid_f'], "50.02 Hz", "Normal")
-    with c2: st.metric(t['voltage'], "440.5 V", "Stable")
-    with c3:
-        if st.session_state.blackout:
-            st.error(t['msg_crit'])
-        else:
-            st.success(t['msg_safe'])
+# 创建实时更新的容器
+metric_row = st.empty()
+chart_placeholder = st.empty()
 
-    # 图表区
-    chart_data = pd.DataFrame(np.random.randn(20, 1) * 0.1 + 50, columns=['Hz'])
-    if st.session_state.blackout:
-        chart_data.iloc[-5:] = 40.0 # 模拟跌落
-    st.line_chart(chart_data)
-
-    # 交互按钮
-    st.divider()
-    if not st.session_state.blackout:
-        if st.button(t['btn_sim'], use_container_width=True, type="primary"):
-            st.session_state.blackout = True
-            st.toast("🚨 ALERT: Power Grid Failed!") # 弹出吐司提示
-            st.balloons()
-            st.rerun()
-    else:
-        if st.button(t['btn_reset'], use_container_width=True):
-            st.session_state.blackout = False
-            st.rerun()
-
-elif page == t['tab2']:
-    st.header(t['tab2'])
-    # 模拟能效分布
-    df = pd.DataFrame({'Source': ['Solar', 'ESS-A', 'ESS-B', 'Gen'], 'Value': [25, 45, 20, 10]})
-    fig = px.pie(df, values='Value', names='Source', hole=0.5, template="plotly_dark")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.info("💡 Optimization Tip: Battery SOH is at 98.2%. Recommendation: Maintain discharge C-rate < 0.5C.")
-
+# 5. 交互按钮
+if not st.session_state.blackout:
+    if st.button(t['btn_sim'], use_container_width=True, type="primary"):
+        st.session_state.blackout = True
+        st.balloons()
 else:
-    st.header(t['tab3'])
-    st.toggle("Auto-Mode (AI)")
-    st.toggle("Cloud Sync")
-    st.slider("Alarm Threshold (Hz)", 45.0, 55.0, 49.5)
+    if st.button(t['btn_reset'], use_container_width=True):
+        st.session_state.blackout = False
+        st.session_state.chart_data = pd.DataFrame([50.0] * 30, columns=['Hz'])
+
+# 6. 核心动态实时循环
+# 我们使用一个 while True 循环来模拟实时刷新（在比赛演示时效果极佳）
+while True:
+    # --- 数据模拟算法 ---
+    if not st.session_state.blackout:
+        new_freq = 50.0 + np.random.uniform(-0.05, 0.05)
+        new_amp = 1200 + np.random.uniform(-10, 10)
+        status_color = "normal"
+    else:
+        # 失电瞬间频率暴跌，然后由 EMS 拉回
+        new_freq = 49.2 + np.random.uniform(-0.1, 0.1)
+        new_amp = 0 + np.random.uniform(0, 5) # 主电源消失，只有应急电流
+        status_color = "inverse"
+
+    # 更新历史数据用于画图
+    new_row = pd.DataFrame([[new_freq]], columns=['Hz'])
+    st.session_state.chart_data = pd.concat([st.session_state.chart_data, new_row], ignore_index=True).iloc[-30:]
+
+    # --- 渲染实时指标 ---
+    with metric_row.container():
+        c1, c2, c3 = st.columns(3)
+        c1.metric(t['grid_f'], f"{new_freq:.2f}", f"{new_freq-50:.3f}")
+        c2.metric(t['amp'], f"{new_amp:.1f} A", "-5.2%" if not st.session_state.blackout else "-100%")
+        if st.session_state.blackout:
+            c3.error(f"⚠️ {t['danger']}")
+        else:
+            c3.success(f"✅ {t['safe']}")
+
+    # --- 渲染实时折线图 ---
+    with chart_placeholder.container():
+        st.line_chart(st.session_state.chart_data, height=300)
+
+    # 稍微停顿一下，模拟采样率（0.5秒刷新一次）
+    time.sleep(0.5)
